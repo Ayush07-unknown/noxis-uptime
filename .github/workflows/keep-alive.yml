@@ -34,7 +34,7 @@ jobs:
 
           START=$(date +%s)
 
-          STATUS=$(curl -s --max-time 15 -o /dev/null -w "%{http_code}" $URL)
+          STATUS=$(curl -s --max-time 25 -o /dev/null -w "%{http_code}" $URL)
 
           END=$(date +%s)
           RESPONSE_TIME=$((END - START))
@@ -47,14 +47,14 @@ jobs:
             echo "⚠️ Initial failure → retrying..."
 
             sleep 10
-            STATUS=$(curl -s --max-time 15 -o /dev/null -w "%{http_code}" $URL)
+            STATUS=$(curl -s --max-time 25 -o /dev/null -w "%{http_code}" $URL)
 
             if [ "$STATUS" -ne 200 ]; then
               echo "💥 Force waking server..."
-              curl --max-time 20 $URL
+              curl --max-time 30 $URL
 
               sleep 15
-              STATUS=$(curl -s --max-time 15 -o /dev/null -w "%{http_code}" $URL)
+              STATUS=$(curl -s --max-time 25 -o /dev/null -w "%{http_code}" $URL)
             fi
           fi
 
