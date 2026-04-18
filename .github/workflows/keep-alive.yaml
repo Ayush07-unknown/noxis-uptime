@@ -1,0 +1,39 @@
+name: Noxis Smart Uptime
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Smart Ping Noxis
+        run: |
+          URL="https://noxisai.onrender.com/health"
+
+          echo "🚀 Checking Noxis backend..."
+
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" $URL)
+
+          echo "Status Code: $STATUS"
+
+          if [ "$STATUS" -ne 200 ]; then
+            echo "⚠️ Server might be sleeping. Retrying..."
+
+            sleep 10
+
+            RETRY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" $URL)
+            echo "Retry Status: $RETRY_STATUS"
+
+            if [ "$RETRY_STATUS" -ne 200 ]; then
+              echo "❌ Server still not responding properly"
+              exit 1
+            else
+              echo "✅ Server recovered after retry"
+            fi
+          else
+            echo "✅ Server is healthy"
+          fi
