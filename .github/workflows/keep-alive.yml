@@ -1,4 +1,4 @@
-name: Noxis Smart Uptime
+name: Noxis Ultra Smart Uptime (IST + Alerts)
 
 on:
   schedule:
@@ -10,30 +10,79 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Smart Ping Noxis
+      - name: Ultra Smart Monitor (IST Optimized)
+        env:
+          WEBHOOK: ${{ secrets.DISCORD_WEBHOOK }}
         run: |
           URL="https://noxisai.onrender.com/health"
 
-          echo "🚀 Checking Noxis backend..."
+          echo "======================================"
+          echo "🚀 Noxis Ultra Smart Monitor (IST)"
+          echo "======================================"
 
-          STATUS=$(curl -s -o /dev/null -w "%{http_code}" $URL)
+          # Get IST hour
+          IST_HOUR=$(TZ="Asia/Kolkata" date +%H)
+          echo "🕒 IST Hour: $IST_HOUR"
 
-          echo "Status Code: $STATUS"
+          # ☀️ Active window: 6 AM → 12 AM IST
+          if [ "$IST_HOUR" -lt 6 ]; then
+            echo "🌙 Outside active hours → Skipping"
+            exit 0
+          fi
 
+          echo "🔍 Checking backend..."
+
+          START=$(date +%s)
+
+          STATUS=$(curl -s --max-time 15 -o /dev/null -w "%{http_code}" $URL)
+
+          END=$(date +%s)
+          RESPONSE_TIME=$((END - START))
+
+          echo "📡 Status: $STATUS"
+          echo "⚡ Response Time: ${RESPONSE_TIME}s"
+
+          # ---------- FAILURE HANDLING ----------
           if [ "$STATUS" -ne 200 ]; then
-            echo "⚠️ Server might be sleeping. Retrying..."
+            echo "⚠️ Initial failure → retrying..."
 
             sleep 10
+            STATUS=$(curl -s --max-time 15 -o /dev/null -w "%{http_code}" $URL)
 
-            RETRY_STATUS=$(curl -s -o /dev/null -w "%{http_code}" $URL)
-            echo "Retry Status: $RETRY_STATUS"
+            if [ "$STATUS" -ne 200 ]; then
+              echo "💥 Force waking server..."
+              curl --max-time 20 $URL
 
-            if [ "$RETRY_STATUS" -ne 200 ]; then
-              echo "❌ Server still not responding properly"
-              exit 1
-            else
-              echo "✅ Server recovered after retry"
+              sleep 15
+              STATUS=$(curl -s --max-time 15 -o /dev/null -w "%{http_code}" $URL)
             fi
-          else
-            echo "✅ Server is healthy"
           fi
+
+          # ---------- FINAL FAILURE ----------
+          if [ "$STATUS" -ne 200 ]; then
+            echo "❌ SERVER DOWN"
+
+            curl -X POST $WEBHOOK \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"content\": \"🚨 **Noxis Backend DOWN!**\nStatus: $STATUS\nTime (IST): $(TZ='Asia/Kolkata' date)\"
+              }"
+
+            exit 1
+          fi
+
+          # ---------- SLOW ALERT ----------
+          if [ "$RESPONSE_TIME" -gt 12 ]; then
+            echo "🐢 Slow response detected"
+
+            curl -X POST $WEBHOOK \
+              -H "Content-Type: application/json" \
+              -d "{
+                \"content\": \"⚠️ **Noxis Slow Response**\nTime: ${RESPONSE_TIME}s\nServer alive but slow 🐢\nChecked at: $(TZ='Asia/Kolkata' date)\"
+              }"
+          fi
+
+          # ---------- SUCCESS ----------
+          echo "======================================"
+          echo "✅ Server Healthy & Stable"
+          echo "======================================"
