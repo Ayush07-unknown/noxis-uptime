@@ -1,1 +1,38 @@
+name: Noxis Smart Uptime
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"   # every 5 minutes
+  workflow_dispatch:
+
+jobs:
+  keep-alive:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Smart Ping Noxis
+        run: |
+          URL="https://noxisai.onrender.com/health"
+
+          HOUR=$(date -u +%H)
+
+          echo "🧠 Smart check at hour: $HOUR UTC"
+
+          # Reduce pings at night
+          if [ "$HOUR" -ge 18 ] || [ "$HOUR" -lt 3 ]; then
+            echo "🌙 Night mode → skipping ping"
+            exit 0
+          fi
+
+          STATUS=$(curl -s -o /dev/null -w "%{http_code}" $URL)
+
+          if [ "$STATUS" -ne 200 ]; then
+            echo "⚠️ Server down → waking up..."
+            curl $URL
+            sleep 15
+            curl $URL
+          else
+            echo "✅ Healthy"
+          fi
+
 
